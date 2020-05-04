@@ -8,9 +8,12 @@ pub(crate) fn one<T>(val: T) -> One<T> {
     (val,)
 }
 
+/// Either is the result of applying `or` to filters
 #[derive(Debug)]
 pub enum Either<T, U> {
+    /// A
     A(T),
+    /// B
     B(U),
 }
 
