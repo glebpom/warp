@@ -3,6 +3,7 @@
 use crate::filter::{filter_fn_one, Filter, One};
 use crate::reject::{self, Rejection};
 use futures::future;
+use http::header::HOST;
 pub use http::uri::Authority;
 use std::str::FromStr;
 
@@ -92,5 +93,26 @@ pub fn optional() -> impl Filter<Extract = One<Option<Authority>>, Error = Rejec
             // parse error
             (_, Some(Err(r))) => Err(r),
         })
+    })
+}
+
+/// Try to get the host from header or from authority
+pub fn host() -> impl Filter<Extract = One<Option<String>>, Error = Rejection> + Copy {
+    filter_fn_one(move |route| {
+        future::ok(
+            route
+                .headers()
+                .get(HOST)
+                .and_then(|host| host.to_str().ok().map(|h| h.to_string()))
+                .or_else(|| {
+                    route.uri().authority().map(|authority| {
+                        let mut host = authority.host().to_string();
+                        if let Some(port) = authority.port() {
+                            host.push_str(&format!(":{}", port));
+                        };
+                        host
+                    })
+                }),
+        )
     })
 }
