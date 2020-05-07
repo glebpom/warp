@@ -32,6 +32,7 @@ where
 pub(crate) struct Route {
     body: BodyState,
     remote_addr: Option<SocketAddr>,
+    local_addr: Option<SocketAddr>,
     req: Request,
     segments_index: usize,
 }
@@ -43,7 +44,11 @@ enum BodyState {
 }
 
 impl Route {
-    pub(crate) fn new(req: Request, remote_addr: Option<SocketAddr>) -> RefCell<Route> {
+    pub(crate) fn new(
+        req: Request,
+        remote_addr: Option<SocketAddr>,
+        local_addr: Option<SocketAddr>,
+    ) -> RefCell<Route> {
         let segments_index = if req.uri().path().starts_with('/') {
             // Skip the beginning slash.
             1
@@ -54,6 +59,7 @@ impl Route {
         RefCell::new(Route {
             body: BodyState::Ready,
             remote_addr,
+            local_addr,
             req,
             segments_index,
         })
@@ -127,6 +133,10 @@ impl Route {
 
     pub(crate) fn remote_addr(&self) -> Option<SocketAddr> {
         self.remote_addr
+    }
+
+    pub(crate) fn local_addr(&self) -> Option<SocketAddr> {
+        self.local_addr
     }
 
     pub(crate) fn take_body(&mut self) -> Option<Body> {

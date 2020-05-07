@@ -114,6 +114,7 @@ use self::inner::OneOrTuple;
 pub fn request() -> RequestBuilder {
     RequestBuilder {
         remote_addr: None,
+        local_addr: None,
         req: Request::default(),
     }
 }
@@ -131,6 +132,7 @@ pub fn ws() -> WsBuilder {
 #[derive(Debug)]
 pub struct RequestBuilder {
     remote_addr: Option<SocketAddr>,
+    local_addr: Option<SocketAddr>,
     req: Request,
 }
 
@@ -366,7 +368,7 @@ impl RequestBuilder {
         // TODO: de-duplicate this and apply_filter()
         assert!(!route::is_set(), "nested test filter calls");
 
-        let route = Route::new(self.req, self.remote_addr);
+        let route = Route::new(self.req, self.remote_addr, self.local_addr);
         let mut fut = Box::pin(
             route::set(&route, move || f.filter(crate::filter::Internal)).then(|result| {
                 let res = match result {
@@ -396,7 +398,7 @@ impl RequestBuilder {
     {
         assert!(!route::is_set(), "nested test filter calls");
 
-        let route = Route::new(self.req, self.remote_addr);
+        let route = Route::new(self.req, self.remote_addr, self.local_addr);
         let mut fut = Box::pin(route::set(&route, move || {
             f.filter(crate::filter::Internal)
         }));

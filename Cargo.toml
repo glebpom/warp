@@ -90,3 +90,6 @@ required-features = ["websocket"]
 
 [[example]]
 name = "query_string"
+
+[patch.crates-io]
+hyper = { path = '../hyper' }

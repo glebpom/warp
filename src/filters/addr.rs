@@ -24,3 +24,23 @@ use crate::filter::{filter_fn_one, Filter};
 pub fn remote() -> impl Filter<Extract = (Option<SocketAddr>,), Error = Infallible> + Copy {
     filter_fn_one(|route| futures::future::ok(route.remote_addr()))
 }
+
+/// Creates a `Filter` to get the local address of the connection.
+///
+/// If the underlying transport doesn't use socket addresses, this will yield
+/// `None`.
+///
+/// # Example
+///
+/// ```
+/// use std::net::SocketAddr;
+/// use warp::Filter;
+///
+/// let route = warp::addr::local()
+///     .map(|addr: Option<SocketAddr>| {
+///         println!("local address = {:?}", addr);
+///     });
+/// ```
+pub fn local() -> impl Filter<Extract = (Option<SocketAddr>,), Error = Infallible> + Copy {
+    filter_fn_one(|route| futures::future::ok(route.local_addr()))
+}

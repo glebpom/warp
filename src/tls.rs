@@ -174,6 +174,10 @@ impl Transport for TlsStream {
     fn remote_addr(&self) -> Option<SocketAddr> {
         Some(self.remote_addr)
     }
+
+    fn local_addr(&self) -> Option<SocketAddr> {
+        Some(self.local_addr)
+    }
 }
 
 enum State {
@@ -187,15 +191,18 @@ enum State {
 pub(crate) struct TlsStream {
     state: State,
     remote_addr: SocketAddr,
+    local_addr: SocketAddr,
 }
 
 impl TlsStream {
     fn new(stream: AddrStream, config: Arc<ServerConfig>) -> TlsStream {
         let remote_addr = stream.remote_addr();
+        let local_addr = stream.local_addr();
         let accept = tokio_rustls::TlsAcceptor::from(config).accept(stream);
         TlsStream {
             state: State::Handshaking(accept),
             remote_addr,
+            local_addr,
         }
     }
 }

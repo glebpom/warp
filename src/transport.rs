@@ -8,11 +8,16 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 pub trait Transport: AsyncRead + AsyncWrite {
     fn remote_addr(&self) -> Option<SocketAddr>;
+    fn local_addr(&self) -> Option<SocketAddr>;
 }
 
 impl Transport for AddrStream {
     fn remote_addr(&self) -> Option<SocketAddr> {
         Some(self.remote_addr())
+    }
+
+    fn local_addr(&self) -> Option<SocketAddr> {
+        Some(self.local_addr())
     }
 }
 
@@ -48,6 +53,10 @@ impl<T: AsyncWrite + Unpin> AsyncWrite for LiftIo<T> {
 
 impl<T: AsyncRead + AsyncWrite + Unpin> Transport for LiftIo<T> {
     fn remote_addr(&self) -> Option<SocketAddr> {
+        None
+    }
+
+    fn local_addr(&self) -> Option<SocketAddr> {
         None
     }
 }

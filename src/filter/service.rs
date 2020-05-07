@@ -74,10 +74,11 @@ where
         &self,
         req: Request,
         remote_addr: Option<SocketAddr>,
+        local_addr: Option<SocketAddr>,
     ) -> FilteredFuture<F::Future> {
         debug_assert!(!route::is_set(), "nested route::set calls");
 
-        let route = Route::new(req, remote_addr);
+        let route = Route::new(req, remote_addr, local_addr);
         let fut = route::set(&route, || self.filter.filter(super::Internal));
         FilteredFuture { future: fut, route }
     }
@@ -99,7 +100,7 @@ where
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        self.call_with_addr(req, None)
+        self.call_with_addr(req, None, None)
     }
 }
 
