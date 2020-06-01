@@ -101,6 +101,9 @@ pub mod test;
 mod tls;
 mod transport;
 
+#[cfg(feature = "tls")]
+pub use tls::TlsConfigBuilder;
+
 pub use generic::Either;
 
 pub use self::error::Error;

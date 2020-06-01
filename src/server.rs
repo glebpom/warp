@@ -1,11 +1,11 @@
-#[cfg(feature = "tls")]
-use crate::tls::TlsConfigBuilder;
 use std::convert::Infallible;
 use std::error::Error as StdError;
 use std::future::Future;
 use std::net::SocketAddr;
 #[cfg(feature = "tls")]
 use std::path::Path;
+#[cfg(feature = "tls")]
+use std::sync::Arc;
 
 use futures::{future, FutureExt, TryFuture, TryStream, TryStreamExt};
 use hyper::server::conn::AddrIncoming;
@@ -17,7 +17,11 @@ use tracing_futures::Instrument;
 use crate::filter::Filter;
 use crate::reject::IsReject;
 use crate::reply::Reply;
+#[cfg(feature = "tls")]
+use crate::tls::TlsConfigBuilder;
 use crate::transport::Transport;
+#[cfg(feature = "tls")]
+use tokio_rustls::rustls::ServerConfig;
 
 /// Create a `Server` with the provided `Filter`.
 pub fn serve<F>(filter: F) -> Server<F>
@@ -43,9 +47,13 @@ pub struct Server<F> {
 ///
 /// *This type requires the `"tls"` feature.*
 #[cfg(feature = "tls")]
-pub struct TlsServer<F> {
+pub struct TlsServer<F, Fut, C>
+where
+    C: FnMut(Option<String>) -> Fut + Unpin + Send + Clone + 'static,
+    Fut: Future<Output = Option<Arc<ServerConfig>>> + Unpin + Send + 'static,
+{
     server: Server<F>,
-    tls: TlsConfigBuilder,
+    config_fn: C,
 }
 
 // Getting all various generic bounds to make this a re-usable method is
@@ -87,8 +95,8 @@ macro_rules! bind_inner {
     (tls: $this:ident, $addr:expr) => {{
         let service = into_service!($this.server.filter);
         let (addr, incoming) = addr_incoming!($addr);
-        let tls = $this.tls.build()?;
-        let srv = HyperServer::builder(crate::tls::TlsAcceptor::new(tls, incoming))
+
+        let srv = HyperServer::builder(crate::tls::TlsAcceptor::new($this.config_fn, incoming))
             .http1_pipeline_flush($this.server.pipeline)
             .serve(service);
         Ok::<_, Box<dyn std::error::Error + Send + Sync>>((addr, srv))
@@ -398,10 +406,14 @@ where
     ///
     /// *This function requires the `"tls"` feature.*
     #[cfg(feature = "tls")]
-    pub fn tls(self) -> TlsServer<F> {
+    pub fn tls<Fut, C>(self, config_fn: C) -> TlsServer<F, Fut, C>
+    where
+        C: FnMut(Option<String>) -> Fut + Unpin + Send + Clone + 'static,
+        Fut: Future<Output = Option<Arc<ServerConfig>>> + Unpin + Send + 'static,
+    {
         TlsServer {
             server: self,
-            tls: TlsConfigBuilder::new(),
+            config_fn,
         }
     }
 }
@@ -409,45 +421,14 @@ where
 // // ===== impl TlsServer =====
 
 #[cfg(feature = "tls")]
-impl<F> TlsServer<F>
+impl<F, Fut, C> TlsServer<F, Fut, C>
 where
     F: Filter + Clone + Send + Sync + 'static,
     <F::Future as TryFuture>::Ok: Reply,
     <F::Future as TryFuture>::Error: IsReject,
+    C: FnMut(Option<String>) -> Fut + Unpin + Send + Clone + 'static,
+    Fut: Future<Output = Option<Arc<ServerConfig>>> + Unpin + Send + 'static,
 {
-    // TLS config methods
-
-    /// Specify the file path to read the private key.
-    pub fn key_path(self, path: impl AsRef<Path>) -> Self {
-        self.with_tls(|tls| tls.key_path(path))
-    }
-
-    /// Specify the file path to read the certificate.
-    pub fn cert_path(self, path: impl AsRef<Path>) -> Self {
-        self.with_tls(|tls| tls.cert_path(path))
-    }
-
-    /// Specify the in-memory contents of the private key.
-    pub fn key(self, key: impl AsRef<[u8]>) -> Self {
-        self.with_tls(|tls| tls.key(key.as_ref()))
-    }
-
-    /// Specify the in-memory contents of the certificate.
-    pub fn cert(self, cert: impl AsRef<[u8]>) -> Self {
-        self.with_tls(|tls| tls.cert(cert.as_ref()))
-    }
-
-    fn with_tls<Func>(self, func: Func) -> Self
-    where
-        Func: FnOnce(TlsConfigBuilder) -> TlsConfigBuilder,
-    {
-        let TlsServer { server, tls } = self;
-        let tls = func(tls);
-        TlsServer { server, tls }
-    }
-
-    // Server run methods
-
     /// Run this `TlsServer` forever on the current thread.
     ///
     /// *This function requires the `"tls"` feature.*
@@ -511,9 +492,11 @@ where
 }
 
 #[cfg(feature = "tls")]
-impl<F> ::std::fmt::Debug for TlsServer<F>
+impl<F, Fut, C> ::std::fmt::Debug for TlsServer<F, Fut, C>
 where
     F: ::std::fmt::Debug,
+    C: FnMut(Option<String>) -> Fut + Unpin + Send + Clone + 'static,
+    Fut: Future<Output = Option<Arc<ServerConfig>>> + Unpin + Send + 'static,
 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         f.debug_struct("TlsServer")
