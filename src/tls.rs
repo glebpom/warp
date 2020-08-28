@@ -7,8 +7,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use futures::future::Fuse;
-use futures::{ready, FutureExt};
+use futures::ready;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::rustls::{NoClientAuth, ServerConfig, TLSError};
 
@@ -187,9 +186,19 @@ where
     }
 }
 
+#[derive(Debug)]
 enum SniError<'a> {
     TooLong,
     ParseError(nom::Err<(&'a [u8], nom::error::ErrorKind)>),
+}
+
+impl<'a> std::fmt::Display for SniError<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SniError::TooLong => write!(f, "ClientHello too long"),
+            SniError::ParseError(e) => write!(f, "ClientHello parse error: {}", e),
+        }
+    }
 }
 
 pub struct RetrieveSniHostname {
@@ -279,7 +288,7 @@ impl Future for RetrieveSniHostname {
                     Err(e) => {
                         return Poll::Ready(Err(io::Error::new(
                             io::ErrorKind::Other,
-                            "bad TLS ClientHello",
+                            format!("bad TLS ClientHello: {}", e),
                         )));
                     }
                 }
@@ -459,7 +468,6 @@ where
 {
     config_fn: C,
     incoming: AddrIncoming,
-    sock: Option<AddrStream>,
 }
 
 impl<Fut, C> TlsAcceptor<Fut, C>
@@ -471,7 +479,6 @@ where
         TlsAcceptor {
             config_fn,
             incoming,
-            sock: None,
         }
     }
 }

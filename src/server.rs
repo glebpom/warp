@@ -3,8 +3,6 @@ use std::error::Error as StdError;
 use std::future::Future;
 use std::net::SocketAddr;
 #[cfg(feature = "tls")]
-use std::path::Path;
-#[cfg(feature = "tls")]
 use std::sync::Arc;
 
 use futures::{future, FutureExt, TryFuture, TryStream, TryStreamExt};
@@ -17,8 +15,6 @@ use tracing_futures::Instrument;
 use crate::filter::Filter;
 use crate::reject::IsReject;
 use crate::reply::Reply;
-#[cfg(feature = "tls")]
-use crate::tls::TlsConfigBuilder;
 use crate::transport::Transport;
 #[cfg(feature = "tls")]
 use tokio_rustls::rustls::ServerConfig;
