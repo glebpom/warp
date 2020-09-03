@@ -3,7 +3,6 @@
 use crate::filter::{filter_fn_one, Filter, One};
 use crate::reject::{self, Rejection};
 use futures::future;
-use http::header::HOST;
 pub use http::uri::Authority;
 use std::str::FromStr;
 
