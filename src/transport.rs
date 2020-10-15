@@ -6,8 +6,11 @@ use std::task::{Context, Poll};
 use hyper::server::conn::AddrStream;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+/// Trait for custom stream on incoming connections implementation
 pub trait Transport: AsyncRead + AsyncWrite {
+    /// Remote address
     fn remote_addr(&self) -> Option<SocketAddr>;
+    /// Local address
     fn local_addr(&self) -> Option<SocketAddr>;
 }
 

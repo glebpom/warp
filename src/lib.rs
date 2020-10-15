@@ -101,6 +101,8 @@ pub mod test;
 mod tls;
 mod transport;
 
+pub use transport::Transport;
+
 #[cfg(feature = "tls")]
 pub use tls::TlsConfigBuilder;
 

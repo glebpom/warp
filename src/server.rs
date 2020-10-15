@@ -157,7 +157,11 @@ where
             .await;
     }
 
-    async fn run_incoming2<I>(self, incoming: I)
+    /// Run this `Server` forever on the current thread with a specific stream
+    /// of incoming connections. Stream should implement `Transport` trait
+    ///
+    /// This can be used for Unix Domain Sockets, or TLS, etc.    
+    pub async fn run_incoming2<I>(self, incoming: I)
     where
         I: TryStream + Send,
         I::Ok: Transport + Send + 'static + Unpin,
@@ -351,6 +355,45 @@ where
         I::Error: Into<Box<dyn StdError + Send + Sync>>,
     {
         let incoming = incoming.map_ok(crate::transport::LiftIo);
+        let service = into_service!(self.filter);
+        let pipeline = self.pipeline;
+
+        async move {
+            let srv =
+                HyperServer::builder(hyper::server::accept::from_stream(incoming.into_stream()))
+                    .http1_pipeline_flush(pipeline)
+                    .serve(service)
+                    .with_graceful_shutdown(signal)
+                    .await;
+
+            if let Err(err) = srv {
+                tracing::error!("server error: {}", err);
+            }
+        }
+        .instrument(tracing::info_span!(
+            "Server::serve_incoming_with_graceful_shutdown"
+        ))
+    }
+
+    /// Setup this `Server` with a specific stream of incoming connections and a
+    /// signal to initiate graceful shutdown.
+    ///
+    /// This can be used for Unix Domain Sockets, or TLS, etc.
+    ///
+    /// When the signal completes, the server will start the graceful shutdown
+    /// process.
+    ///
+    /// Returns a `Future` that can be executed on any runtime.
+    pub fn serve_incoming_with_graceful_shutdown2<I>(
+        self,
+        incoming: I,
+        signal: impl Future<Output = ()> + Send + 'static,
+    ) -> impl Future<Output = ()>
+    where
+        I: TryStream + Send,
+        I::Ok: Transport + Send + 'static + Unpin,
+        I::Error: Into<Box<dyn StdError + Send + Sync>>,
+    {
         let service = into_service!(self.filter);
         let pipeline = self.pipeline;
 
